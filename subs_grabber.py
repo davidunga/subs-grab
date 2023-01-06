@@ -3,7 +3,8 @@ import os
 from pathlib import Path
 import glob
 from open_subtitles import OpenSubtitles
-
+from filename_matcher import FilenameMatcher
+from typing import List
 
 # ------------------------------------------------------
 
@@ -20,25 +21,34 @@ class SubtitlesGrabber:
         self.open_subtitles = OpenSubtitles(login=True)
         self.languages = set(lang.split(","))
         self._supports_multi_cd = False
+        self._filematcher = FilenameMatcher()
 
     @staticmethod
     def build_subtitle_filename(base_fname: str, lang: str) -> str:
         return f"{base_fname}.{lang}.srt"
 
-    def find_subtitles_for_nfo(self, nfo_file: str, search_params: dict):
-        """ Search for subtitles for nfo file """
+    def find_subtitles_for_nfo(self, nfo_file: str, search_params: dict) -> (dict, None):
+        """ Get for subtitles for nfo file. Returns the matching subtitle item, or None if nothing is found  """
         assert "languages" in search_params, "Subtitle languages must be specified"
         search_params["imdb_id"] = _read_nfo(nfo_file, "imdbid")
-        return self.search(search_params)
+        result = self.search(search_params)
+        if len(result) == 0:
+            return None
+        subtitle_fnames = [item['attributes']['files'][0]['file_name'] for item in result]
+        result_ix = self._filematcher.get_best_match_ix(nfo_file, subtitle_fnames)
+        if result_ix is None:
+            return None
+        return result[result_ix]
 
-    def search(self, search_params, sort_by="download_count"):
+    def search(self, search_params: dict) -> List[dict]:
         result = self.open_subtitles.search(search_params)
         if not self._supports_multi_cd:
-            result = [r for r in result if len(r['attributes']['files']) == 1]
-        return [r for _, r in sorted(zip([r['attributes'][sort_by] for r in result], result),
-                                     key=lambda x: x[0], reverse=True)]
+            result = [r for r in result if len(r['attributes']['files']) == 1 and
+                      r['attributes']['files'][0]['file_name'] is not None]
+        return result
 
-    def find_existing_subtitles_for_file(self, fname: str):
+    def find_existing_subtitles_for_file(self, fname: str) -> List[str]:
+        """ returns list of subtitle languages that exist (locally) for an nfo/media file """
         base_fname = os.path.splitext(fname)[0]
         existing_langs = []
         for stfile in glob.glob(self.build_subtitle_filename(glob.escape(base_fname), lang="*")):
@@ -57,7 +67,7 @@ class SubtitlesGrabber:
 
         base_fname = os.path.splitext(fname)[0]
 
-        def _finalize(status):
+        def _finalize(status, subtitle_fname: str = None):
             if status == "exist":
                 msg = "Subtitles already exist"
             elif status == "notfound":
@@ -69,7 +79,10 @@ class SubtitlesGrabber:
             else:
                 raise ValueError("Unknown status")
             if verbose:
-                print(f"{msg:25} - {base_fname}")
+                print(f"{msg:25} - {base_fname}", end="")
+                if subtitle_fname is not None:
+                    print(f" <- {subtitle_fname}", end="")
+                print("")
             return status
 
         missing_langs = self.languages.difference(self.find_existing_subtitles_for_file(fname))
@@ -79,18 +92,18 @@ class SubtitlesGrabber:
         nfo_file = base_fname + ".nfo"
         assert os.path.isfile(nfo_file), "No nfo file: " + str(nfo_file)
 
-        subtitle_items = self.find_subtitles_for_nfo(nfo_file, {"languages": missing_langs})
-
-        if len(subtitle_items) == 0:
+        subtitle_item = self.find_subtitles_for_nfo(nfo_file, {"languages": missing_langs})
+        if subtitle_item is None:
             return _finalize("notfound")
 
-        subtitle_attribs = subtitle_items[0]['attributes']
         if not self._supports_multi_cd:
-            assert len(subtitle_attribs['files']) == 1
-        dst_stfile = self.build_subtitle_filename(base_fname, lang=subtitle_attribs['language'])
+            assert len(subtitle_item['attributes']['files']) == 1
 
-        self.open_subtitles.download_item(subtitle_attribs['files'][0], dst_stfile)
-        return _finalize("downloaded" if os.path.isfile(dst_stfile) else "failed")
+        dst_stfile = self.build_subtitle_filename(base_fname, lang=subtitle_item['attributes']['language'])
+        subtitle_file_item = subtitle_item['attributes']['files'][0]
+        self.open_subtitles.download_item(subtitle_file_item, dst_stfile)
+
+        return _finalize("downloaded" if os.path.isfile(dst_stfile) else "failed", subtitle_file_item['file_name'])
 
 
 # ------------------------------------------------------
