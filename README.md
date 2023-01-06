@@ -6,7 +6,7 @@ Basic subtitle scanner and downloader, for use alongside local streaming service
 
 ### Setup:
 1. Make sure your streaming application is configured to save metadata locally.
-2. Create a credentials.json file under /subs-grabber, with your opensubtitles credentials:
+2. Create a credentials.json file under /subs-grab, with your opensubtitles credentials:
 ```json
 {
   "username": your-opensubtitles-username,
