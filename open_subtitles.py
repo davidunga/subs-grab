@@ -38,6 +38,7 @@ class OpenSubtitles:
         """
         self.credentials = load_credentials() if credentials is None else credentials
         self.token = None
+        self.remaining_downloads = None
         if login:
             self.login()
 
@@ -49,6 +50,10 @@ class OpenSubtitles:
         )
         response.raise_for_status()
         self.token = response.json()['token']
+        try:
+            self.remaining_downloads = response.json()['user']['remaining_downloads']
+        except:
+            pass
 
     def search(self, search_params: dict) -> dict:
         """ Search open subtitles DB """
@@ -76,6 +81,8 @@ class OpenSubtitles:
         )
         response.raise_for_status()
         open(dst_fname, 'wb').write(requests.get(response.json()['link']).content)
+
+        self.remaining_downloads = response.json()['remaining']
 
 
 # ------------------------------------------------------
