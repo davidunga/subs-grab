@@ -1,6 +1,6 @@
 import PTN
 import os
-from typing import List, Callable
+from typing import List
 
 
 def parse_fname(fn: str) -> dict:
