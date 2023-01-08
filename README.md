@@ -16,13 +16,16 @@ Basic subtitle scanner and downloader, for use alongside local streaming service
 ```
 
 ### Usage:
-Grab subtitles for media under \<media_dir\> recursively:
+Grab subtitles for media under [media_dir] recursively:
 </br>
-&nbsp;&nbsp;subsgrab.py \<media_dir\> [--lang \<langauges\>]
+>&nbsp;&nbsp;subsgrab.py [media_dir] [langauge(s)]
 </br>
 #### Example:
-Grab spanish subtitles for media under D:\Media\TvShows
+1. Grab English subtitles for media under ~/movies:
 </br>
-&nbsp;&nbsp;subsgrab.py D:\Media\TvShows --lang es
-
+> &nbsp;&nbsp;subsgrab.py ~/movies en
+</br>
+2. Grab subtitles with priority to Spanish, then English, then French:
+</br>
+>&nbsp;&nbsp;subsgrab.py ~/movies es,en,fr
 </div>
